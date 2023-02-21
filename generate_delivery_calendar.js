@@ -10,11 +10,11 @@ let subscriptionsView = subscriptionsTable.getView("Grid view");
 let deliveryCalendarTable = base.getTable("Delivery Calendar");
 let deliveryCalendarView = deliveryCalendarTable.getView("Grid view");
 
-let subscriberResults = await subscribersView.selectRecordsAsync({fields: ['Name', 'Route']});
+let subscriberResults = await subscribersView.selectRecordsAsync({fields: ['Name', 'Route', 'Segment']});
 let subscriptionsResults = await subscriptionsView.selectRecordsAsync({fields: ['Subscribers','Frequency (in weeks)']});
 let deliveryCalendarResults = await deliveryCalendarView.selectRecordsAsync({fields: ['Delivery Weekend','Subscriptions']});
 
-let deliveryStartDate = new Date("April 8, 2023");
+let deliveryStartDate = new Date("April 11, 2023");
 
 // Updates can only be in batches of 50
 let updates = new Array();
@@ -26,6 +26,7 @@ for(let subscriberRecord of subscriberResults.records){
   let deliverySlots = new Set();
   let subscriberName = subscriberRecord.getCellValue('Name');
   let route = subscriberRecord.getCellValueAsString('Route');
+  let segment = subscriberRecord.getCellValueAsString('Segment');
 
   for(let shareRecord of subscriptionsResults.records){
 
@@ -34,8 +35,11 @@ for(let subscriberRecord of subscriberResults.records){
           let freqency = parseInt(shareRecord.getCellValueAsString("Frequency (in weeks)"));
           let freqIterator = 1;
           let deliveryIterator = new Date(deliveryStartDate);
-          if(route == "North"){
-            deliveryIterator.setDate(deliveryIterator.getDate() + 1);
+          let routeIncrement = (route == "CVL" ? 0 : (route == "RVA" ? 1 : (route == "NOVA" ? 2 : (route == "DC") ? 3 : 0)));
+
+          deliveryIterator.setDate(deliveryIterator.getDate() + routeIncrement);
+          if(segment == "EAST"){
+            deliveryIterator.setDate(deliveryIterator.getDate() + 7);
           }
 
           let newDeliveries = new Array();
@@ -66,10 +70,6 @@ for(let subscriberRecord of subscriberResults.records){
                      
                      newDeliveries.push({id: deliveryDate.id, fields: {"Subscriptions": newSubsArr}});
                      interiorBatchSize++;
-                     output.text(interiorBatchSize);
-                     //await deliveryCalendarTable.updateRecordAsync(deliveryDate.id, {
-                     //   "Subscriptions" : newSubsArr,
-                     // });
 
                      if(interiorBatchSize == 50){
                        await deliveryCalendarTable.updateRecordsAsync(newDeliveries);

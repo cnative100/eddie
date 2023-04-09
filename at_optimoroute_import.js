@@ -10,7 +10,7 @@ let deliveryCalendarTable = base.getTable("Delivery Calendar");
 let deliveryCalendarView = deliveryCalendarTable.getView("Grid view");
 
 let subscriberResults = await subscribersView.selectRecordsAsync({fields: ['Name', 'Route', 'Segment']});
-let subscriptionsResults = await subscriptionsView.selectRecordsAsync({fields: ['Subscribers','Frequency (in weeks)']});
+let subscriptionsResults = await subscriptionsView.selectRecordsAsync({fields: ['Subscribers','Frequency (in weeks)', 'Share']});
 let deliveryCalendarResults = await deliveryCalendarView.selectRecordsAsync({fields: ['Delivery Weekend', 'Subscribers (from Subscriptions)', 'Subscriptions']});
 
 let optimorouteImportTable = base.getTable("Optimoroute Import");
@@ -22,7 +22,11 @@ let deliveryDates = [new Date("April 11, 2023"),
                      new Date("April 18, 2023"),
                      new Date("April 19, 2023"),
                      new Date("April 20, 2023"),
-                     new Date("April 21, 2023")];
+                     new Date("April 21, 2023"),
+                     new Date("April 25, 2023"),
+                     new Date("April 26, 2023"),
+                     new Date("April 27, 2023"),
+                     new Date("April 28, 2023")];
 let driver = "Matthew Nunnally";
 
 
@@ -38,17 +42,38 @@ for(let deliveryDate of deliveryDates){
             deliveryDate.toLocaleDateString('en-us', {year:"numeric", month:"long", day:"numeric"})){
                 
                 let subscribers = deliveryRecord.getCellValue("Subscribers (from Subscriptions)");
+                let subscriptions = deliveryRecord.getCellValue("Subscriptions");
                 let subscriberIdSet = new Set();
-                
+                let subscriptionsIdSet = new Set();
+
                 // Add the IDs to a set, because there will be multiple entries for the same
                 // subscriber on a given delivery date
                 for(let subscriber of subscribers){
                     subscriberIdSet.add(subscriber.id);
                 }
 
+                for(let subscription of subscriptions){
+                    subscriptionsIdSet.add(subscription.id);
+                }
+
                 for(let subscriberId of subscriberIdSet){
                     let subscriberDetails = await subscribersView.selectRecordAsync(subscriberId);
+
                     if(subscriberDetails && subscriberDetails.getCellValueAsString("Reserved") == "Yes"){
+                        let subscriptionsDelivered = "";
+                        for(let subscriptionId of subscriptionsIdSet){
+                            let subscriptionDetails = await subscriptionsView.selectRecordAsync(subscriptionId);
+                            
+                            if(subscriptionDetails && subscriptionDetails.getCellValue("Subscribers") &&
+                               subscriptionDetails.getCellValueAsString("Subscribers") == subscriberDetails.getCellValueAsString("Name")){
+                                   subscriptionsDelivered = subscriptionsDelivered.concat(subscriptionDetails.getCellValueAsString("Share"))
+                                                                                  .concat(" (")
+                                                                                  .concat(subscriptionDetails.getCellValueAsString("Number of Shares"))
+                                                                                  .concat(" shares)")
+                                                                                  .concat(", ");
+                            }
+                        }
+
                         let newDeliveryID = await optimorouteImportTable.createRecordAsync({
                             "Customer": subscriberDetails.getCellValueAsString("Name"),
                             "Address": subscriberDetails.getCellValueAsString("Delivery Address"),
@@ -56,7 +81,8 @@ for(let deliveryDate of deliveryDates){
                             "Email": subscriberDetails.getCellValueAsString("Email"),
                             "Phone": subscriberDetails.getCellValueAsString("Cell Phone"),
                             "Date": deliveryDate,
-                            "Duration": 2
+                            "Duration": 2,
+                            "Notes": subscriptionsDelivered.substring(0,subscriptionsDelivered.length-2)
                         });
 
                     }
